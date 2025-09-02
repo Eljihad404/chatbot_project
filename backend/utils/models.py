@@ -1,0 +1,131 @@
+# models.py
+import uuid
+from sqlalchemy import (
+    Column, String, Boolean, DateTime, ForeignKey, Integer, Text, JSON, BigInteger
+)
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
+from utils.db import Base
+import uuid
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy import Column, String
+from sqlalchemy.dialects.postgresql import JSONB
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    username = Column(String, unique=True, nullable=False, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    # DB column name is 'hashed_pw'
+    hashed_password = Column("hashed_pw", String, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_login = Column(DateTime(timezone=True))
+    roles = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
+
+class Role(Base):
+    __tablename__ = "roles"
+    role_id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, unique=True, nullable=False)
+    description = Column(Text)
+
+class UserRole(Base):
+    __tablename__ = "user_roles"
+    user_id = Column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    role_id = Column(Integer, ForeignKey("roles.role_id", ondelete="CASCADE"), primary_key=True)
+
+    user = relationship("User", back_populates="roles")
+    role = relationship("Role")
+
+class Chat(Base):
+    __tablename__ = "chats"
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+class Message(Base):
+    __tablename__ = "messages"
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    chat_id = Column(PGUUID(as_uuid=True), ForeignKey("chats.id", ondelete="CASCADE"), nullable=False)
+    sender = Column(String, nullable=False)  # 'user' | 'assistant'
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+class File(Base):
+    __tablename__ = "files"
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    chat_id = Column(PGUUID(as_uuid=True), ForeignKey("chats.id", ondelete="SET NULL"))
+    filename = Column(Text, nullable=False)
+    mime_type = Column(Text)
+    storage_path = Column(Text, nullable=False)
+    uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+class Activity(Base):
+    __tablename__ = "activities"
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    activity = Column(Text, nullable=False)
+    meta = Column("metadata", JSON)  # python attr 'meta', DB column 'metadata'
+    occurred_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+class RequestLog(Base):
+    __tablename__ = "request_logs"
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    method = Column(Text, nullable=False)
+    path = Column(Text, nullable=False)
+    status_code = Column(Integer, nullable=False)
+    ip_address = Column(Text)
+    user_agent = Column(Text)
+    query_params = Column(Text)
+    body = Column(JSON)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+class Document(Base):
+    __tablename__ = "documents"
+
+    # md5 of filename+content_hash generated in docs.py
+    id = Column(String, primary_key=True)
+
+    filename = Column(Text, nullable=False)
+    ext = Column(String(16), nullable=False)
+    size_bytes = Column(BigInteger, nullable=False)
+    content_hash = Column(String(64), nullable=False)
+
+    storage_path = Column(Text, nullable=False)
+
+    source = Column(Text)                      # optional
+    tags = Column(JSON)                        # list[str] (JSON works on SQLite & Postgres)
+    uploaded_by = Column(Text)                 # user id / email
+    status = Column(String(32), nullable=False, default="ready")
+
+    uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+class VerificationCode(Base):
+    __tablename__ = "verification_codes"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)  # <— use PG_UUID
+    user_id = Column(PG_UUID(as_uuid=True),
+                     ForeignKey("users.id", ondelete="CASCADE"),
+                     nullable=False)
+    purpose = Column(String, nullable=False)
+    code_hash = Column(String, nullable=False)
+    attempts = Column(Integer, nullable=False, default=0)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    consumed_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+class ConfigKV(Base):
+    __tablename__ = "config_kv"
+    id = Column(Integer, primary_key=True)
+    k = Column(String(128), unique=True, index=True, nullable=False)
+    v = Column(Text, nullable=False)  # store JSON-serialized text
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class Setting(Base):
+    __tablename__ = "settings"
+    key = Column(String, primary_key=True, index=True)
+    value = Column(JSONB, nullable=True)   
