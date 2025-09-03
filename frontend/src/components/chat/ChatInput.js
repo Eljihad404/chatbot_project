@@ -15,8 +15,16 @@ const iconFor = (file) => {
   return FileText;
 };
 
+/**
+ * Props:
+ *  - mode: 'compose' | 'edit'
+ *  - draft: string (for edit mode)
+ *  - onDraftChange: fn
+ *  - onSubmitEdit: fn
+ *  - onCancelEdit: fn
+ */
 const ChatInput = forwardRef(function ChatInput(
-  { onSend, disabled, onUploadDocs },
+  { onSend, disabled, onUploadDocs, mode = "compose", draft = "", onDraftChange, onSubmitEdit, onCancelEdit },
   ref
 ) {
   const [text, setText] = useState("");
@@ -25,11 +33,18 @@ const ChatInput = forwardRef(function ChatInput(
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
 
-  const send = () => {
-    const t = text.trim();
+  const currentText = mode === "edit" ? draft : text;
+  const setCurrentText = mode === "edit" ? onDraftChange : setText;
+
+  const triggerSend = () => {
+    const t = (currentText || "").trim();
     if (!t) return;
-    onSend?.(t);
-    setText("");
+    if (mode === "edit") {
+      onSubmitEdit?.(t);
+    } else {
+      onSend?.(t);
+      setText("");
+    }
   };
 
   const onPickFiles = (e) => {
@@ -162,21 +177,30 @@ const ChatInput = forwardRef(function ChatInput(
           ref={ref}
           type="text"
           disabled={disabled}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
+          value={currentText}
+          onChange={(e) => setCurrentText?.(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) send();
-            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") send();
+            if (e.key === "Enter" && !e.shiftKey) triggerSend();
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") triggerSend();
           }}
           className="flex-grow px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          placeholder="Ask anything…"
+          placeholder={mode === "edit" ? "Edit your last prompt…" : "Ask anything…"}
         />
+        {mode === "edit" && (
+          <button
+            onClick={onCancelEdit}
+            disabled={disabled}
+            className="px-3 py-3 rounded-xl border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            Cancel
+          </button>
+        )}
         <button
-          onClick={send}
+          onClick={triggerSend}
           disabled={disabled}
           className="px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-60"
         >
-          Send
+          {mode === "edit" ? "Update" : "Send"}
         </button>
       </div>
     </div>

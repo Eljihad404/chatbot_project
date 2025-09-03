@@ -9,6 +9,8 @@ from api.admin_controller import router as admin_router
 from api.admin_analytics_controller import router as admin_analytics_router
 from api.docs_controller import router as docs_router
 from api.chat_controller import router as chat_router, init_rag_chain
+
+from utils.langchain_store import ensure_collection
 #from chat import router as chat_router, init_rag_chain
 #from admin import router as admin_router
 #from docs import router as docs_router
@@ -32,6 +34,10 @@ app.add_middleware(
 async def startup_event():
     await init_rag_chain()
 """
+@app.on_event("startup")
+async def startup():
+    import asyncio
+    await asyncio.to_thread(ensure_collection) 
 # Routers
 #app.include_router(docs_router, prefix="/docs", tags=["docs"])  # /docs now serves your API
 app.include_router(auth_router)

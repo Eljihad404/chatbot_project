@@ -6,6 +6,7 @@ import Topbar from "../components/chat/Topbar";
 import ChatMessages from "../components/chat/ChatMessages";
 import ChatInput from "../components/chat/ChatInput";
 import { getInitials } from "../utils/chat/getInitials";
+import SettingsModal from "../components/chat/SettingsModal";
 
 export default function ChatPage() {
   const navigate = useNavigate();
@@ -22,10 +23,16 @@ export default function ChatPage() {
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState("");
 
+  // --- Edit-last state ---
+  const [editMode, setEditMode] = useState(false);
+  const [editDraft, setEditDraft] = useState("");
+
   // --- Refs ---
   const inputRef = useRef();
   const scrollRef = useRef();
   const didInit = useRef(false);
+
+  const [settingsOpen, setSettingsOpen] = useState(false); // ADD
 
   // --- Auth/API ---
   const token = localStorage.getItem("token");
@@ -96,7 +103,10 @@ export default function ChatPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`Status ${res.status}`);
-      setMessages(await res.json());
+      const history = await res.json();
+      // Mark all history as non-animated so they don't re-type on reload
+      const mapped = (history || []).map((m) => ({ ...m, meta: { ...(m.meta || {}), animate: false } }));
+      setMessages(mapped);
     } catch (e) {
       console.error(e);
       setError("Failed to load conversation");
@@ -184,11 +194,14 @@ export default function ChatPage() {
       return;
     }
 
-    // Stream assistant chunks
+    // Stream assistant chunks (only the live assistant message animates)
     const reader = res.body.getReader();
     const decoder = new TextDecoder("utf-8");
     let assistantText = "";
-    setMessages((prev) => [...prev, { role: "assistant", content: [{ text: "" }] }]);
+    setMessages((prev) => [
+      ...prev,
+      { role: "assistant", content: [{ text: "" }], meta: { animate: true } },
+    ]);
 
     while (true) {
       const { done, value } = await reader.read();
@@ -196,13 +209,84 @@ export default function ChatPage() {
       assistantText += decoder.decode(value);
       setMessages((prev) => {
         const copy = [...prev];
-        copy[copy.length - 1] = { role: "assistant", content: [{ text: assistantText }] };
+        const idx = copy.length - 1;
+        copy[idx] = { ...copy[idx], content: [{ text: assistantText }], meta: { ...(copy[idx].meta || {}), animate: true } };
         return copy;
       });
     }
 
+    // Stop animating once finished
+    setMessages((prev) => {
+      const copy = [...prev];
+      const idx = copy.length - 1;
+      if (copy[idx]?.role === "assistant") {
+        copy[idx] = { ...copy[idx], meta: { ...(copy[idx].meta || {}), animate: false } };
+      }
+      return copy;
+    });
+
     setStreaming(false);
   }
+
+  // --- Edit last prompt ---
+  function startEditLast() {
+    // Find last user message
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]?.role === "user") {
+        const txt = (messages[i].content || []).map((c) => c.text).join("");
+        setEditDraft(txt);
+        setEditMode(true);
+        break;
+      }
+    }
+  }
+
+  async function submitEditLast(newText) {
+    // Remove last assistant (if trailing) and last user locally for UI correctness
+    setMessages((prev) => {
+      const arr = [...prev];
+      if (arr.length && arr[arr.length - 1].role === "assistant") arr.pop();
+      for (let i = arr.length - 1; i >= 0; i--) {
+        if (arr[i].role === "user") { arr.splice(i, 1); break; }
+      }
+      return arr;
+    });
+
+    // Try optional backend trim (best effort, ignored if not implemented)
+    try {
+      await fetch(`${API}/chat/trim`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ chat_id: currentId, turns: 1 })
+      });
+    } catch (_) {}
+
+    setEditMode(false);
+    setEditDraft("");
+    await sendMessage(newText);
+  }
+  // ADD if you don't already have them:
+async function saveProfile({ username, email }) {
+  const res = await fetch(`${API}/users/me`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ username, email })
+  });
+  if (!res.ok) throw new Error(`Status ${res.status}`);
+  const updated = await res.json().catch(() => ({ username, email }));
+  setMe(prev => ({ ...(prev || {}), ...updated }));
+}
+
+async function changePassword({ current_password, new_password }) {
+  const res = await fetch(`${API}/users/change-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ current_password, new_password })
+  });
+  if (!res.ok) throw new Error(`Status ${res.status}`);
+  await res.json().catch(() => ({}));
+}
+
 
   // --- Docs upload (new UI section; optional backend at /docs/upload) ---
   async function uploadDocs(files) {
@@ -216,7 +300,6 @@ export default function ChatPage() {
         body: form,
       });
       if (!res.ok) throw new Error(`Status ${res.status}`);
-      // Optional: you can toast a small confirmation by setting error to "" and maybe console.log
       return await res.json().catch(() => ({}));
     } catch (e) {
       console.error(e);
@@ -246,21 +329,42 @@ export default function ChatPage() {
       <div className="flex-1 flex flex-col">
         {/* Topbar */}
         <Topbar
-          title={currentId ? "Conversation" : "Start a new conversation"}
-          streaming={streaming}
-          onLogout={handleLogout}
-          initials={initials}
-          userLabel={me?.username || me?.email || "User"}
+            title={currentId ? "Conversation" : "Start a new conversation"}
+            streaming={streaming}
+            initials={initials}
+            userLabel={me?.username || me?.email || "User"}
+            onOpenSettings={() => setSettingsOpen(true)}   // ADD
+            onLogout={handleLogout}                        // ensure passed
         />
+
 
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
-          <ChatMessages messages={messages} />
+          <ChatMessages messages={messages} onEditLast={startEditLast} />
         </div>
 
         {/* Composer + Docs */}
-        <ChatInput onSend={sendMessage} ref={inputRef} disabled={streaming} onUploadDocs={uploadDocs} />
+        <ChatInput
+          onSend={sendMessage}
+          ref={inputRef}
+          disabled={streaming}
+          onUploadDocs={uploadDocs}
+          mode={editMode ? "edit" : "compose"}
+          draft={editDraft}
+          onDraftChange={setEditDraft}
+          onSubmitEdit={submitEditLast}
+          onCancelEdit={() => { setEditMode(false); setEditDraft(""); }}
+        />
+        <SettingsModal
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            me={me}
+            onSaveProfile={saveProfile}
+            onChangePassword={changePassword}
+        />
+
       </div>
     </div>
   );
 }
+
