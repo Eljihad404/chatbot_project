@@ -57,9 +57,12 @@ GROQ_API_KEY=your_api_key
 # CORS
 CORS_ORIGINS=http://localhost:3000
 
+```
 ## Build & run:
+``` 
 docker compose build --no-cache
 docker compose up
+```
 
 ## Open:
 Backend API: http://localhost:8000
@@ -70,7 +73,7 @@ Qdrant Dashboard: http://localhost:6333/dashboard
 
 
 ### 💻 Run Locally (without Docker)
-
+```
 ## Backend
 cd backend
 python -m venv my_env
@@ -82,31 +85,39 @@ my_env\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --reload
 # http://localhost:8000 
+```
 
 ## Frontend
+```
 cd frontend
 npm install
 npm run dev
-# http://localhost:3000
+```
+http://localhost:3000
 
 ## Qdrant (standalone in Docker)
+```
 docker run -p 6333:6333 \
   -v ./qdrant_storage:/qdrant/storage \
   qdrant/qdrant
-# Dashboard: http://localhost:6333/dashboard
+  ```
+ Dashboard: http://localhost:6333/dashboard
 
-## PostgreSQL
+### PostgreSQL
 Install locally or run in Docker. Then create DB:
 
-# sql
+### sql
 Copy code
+```
 CREATE DATABASE rag_db;
+```
 Set DATABASE_URL accordingly, e.g.:
 
-# bash
+### bash
 Copy code
+```
 postgresql+psycopg2://user:password@localhost:5432/rag_db
-
+```
 ## Configuration 
 | Key                           | Example                                                        | Notes                            |
 | ----------------------------- | -------------------------------------------------------------- | -------------------------------- |
