@@ -1,112 +1,129 @@
-📚 RAG Chatbot Platform
+# 📚 RAG Chatbot Platform
 
-An enterprise-grade Retrieval-Augmented Generation (RAG) chatbot built with FastAPI, React.js, LangChain, Qdrant, and Groq LLM.
-It supports document uploads, semantic search, user authentication, and admin dashboards for analytics and monitoring.
+Enterprise-grade Retrieval-Augmented Generation (RAG) chatbot built with **FastAPI**, **React**, **LangChain**, **Qdrant**, **PostgreSQL**, and **Groq**.  
+Supports document upload, semantic search, auth with roles, and an admin dashboard for usage analytics.
 
-🚀 Features
+---
 
-🔐 User authentication (JWT-based with role support: user/admin)
+## ✨ Features
 
-📂 Document upload & embedding into Qdrant vector database
+- 🔐 **Auth** — JWT with roles (`user`, `admin`)
+- 📂 **Docs** — upload → chunk → embed into **Qdrant**
+- 🧠 **RAG** — LangChain retriever + Groq LLM
+- ⚡ **Streaming** — real-time typing effect in UI
+- 📊 **Admin** — token usage & chat analytics
+- 🧩 **Modular** — controllers / services / models
+- 🎨 **Modern UI** — dark mode, chat sidebar, document manager
 
-🧠 Retrieval-Augmented Generation with LangChain + Groq LLM
+---
 
-📊 Admin dashboard: token usage, chat analytics
+## 🧱 Tech Stack
 
-⚡ Real-time streaming with typing animation in UI
-
-🧩 Modular architecture (controllers / services / models)
-
-🎨 Modern React UI with dark mode, chat sidebar, and document manager
-
-🛠️ Setup Instructions
-1️⃣ Clone the repository
-git clone https://github.com/your-username/rag-chatbot.git
-cd rag-chatbot
-
-2️⃣ Backend Setup (FastAPI)
-Create virtual environment
-cd backend
-python -m venv my_env
-# Activate:
-my_env\Scripts\activate      # Windows
-# source my_env/bin/activate # Linux/Mac
-
-Install dependencies
-pip install -r requirements.txt
-
-Run backend server
-uvicorn main:app --reload
+**Frontend:** React (Vite) → served by Nginx in prod  
+**Backend:** FastAPI, SQLAlchemy, Pydantic v2  
+**Vector DB:** Qdrant  
+**Relational DB:** PostgreSQL  
+**RAG:** LangChain + sentence-transformers  
+**LLM:** Groq (API)  
+**Infra:** Docker / Docker Compose
 
 
-Backend will run at 👉 http://localhost:8000
+---
 
-3️⃣ Frontend Setup (React.js)
-cd frontend
-npm install
-npm run dev
+## 🚀 Quick Start (Docker Compose – recommended)
 
+1. Create `.env` at the **repo root**:
 
-Frontend will run at 👉 http://localhost:3000
-
-4️⃣ Vector Database (Qdrant)
-
-Run Qdrant in Docker:
-
-docker run -p 6333:6333 \
-  -v ./qdrant_storage:/qdrant/storage \
-  qdrant/qdrant
-
-
-Qdrant dashboard: 👉 http://localhost:6333/dashboard
-
-5️⃣ Database (PostgreSQL)
-
-Make sure PostgreSQL is installed and running.
-Create a database:
-
-CREATE DATABASE rag_db;
-
-6️⃣ Environment Variables
-
-Create a .env file inside backend/:
-
+```env
 # Security
 SECRET_KEY=change-me
 ACCESS_TOKEN_EXPIRE_MINUTES=120
 
-# Database
-DATABASE_URL=postgresql+psycopg2://user:password@localhost:5432/rag_db
+# DB (Compose uses service name 'postgres')
+POSTGRES_DB=rag_db
+POSTGRES_USER=rag_user
+POSTGRES_PASSWORD=rag_pass
+
+# SQLAlchemy URL used by backend
+DATABASE_URL=postgresql+psycopg2://rag_user:rag_pass@postgres:5432/rag_db
 
 # Qdrant
-QDRANT_HOST=localhost
-QDRANT_PORT=6333
+QDRANT_URL=http://qdrant:6333
+QDRANT_COLLECTION=jesa_docs
 
 # LLM
 GROQ_API_KEY=your_api_key
 
-# CORS (frontend allowed origins)
+# CORS
 CORS_ORIGINS=http://localhost:3000
 
-🧑‍💻 Usage
+## Build & run:
+docker compose build --no-cache
+docker compose up
 
-Sign up / login in the frontend UI
+## Open:
+Backend API: http://localhost:8000
 
-Upload documents → automatically embedded into Qdrant
+Frontend UI: http://localhost:3000
 
-Ask questions → chatbot retrieves context + generates response with Groq
-
-Admins → monitor token usage & latency metrics in the dashboard
-
-🐳 Optional: Docker Compose
-
-You can run everything with a single command:
-
-docker-compose up --build
-
- Deploy to Kubernetes
+Qdrant Dashboard: http://localhost:6333/dashboard
 
 
-📜 License
+### 💻 Run Locally (without Docker)
 
-MIT License © 2025 El-houssaine El-jihad
+## Backend
+cd backend
+python -m venv my_env
+# Windows:
+my_env\Scripts\activate
+# Linux/Mac:
+# source my_env/bin/activate
+
+pip install -r requirements.txt
+uvicorn main:app --reload
+# http://localhost:8000 
+
+## Frontend
+cd frontend
+npm install
+npm run dev
+# http://localhost:3000
+
+## Qdrant (standalone in Docker)
+docker run -p 6333:6333 \
+  -v ./qdrant_storage:/qdrant/storage \
+  qdrant/qdrant
+# Dashboard: http://localhost:6333/dashboard
+
+## PostgreSQL
+Install locally or run in Docker. Then create DB:
+
+# sql
+Copy code
+CREATE DATABASE rag_db;
+Set DATABASE_URL accordingly, e.g.:
+
+# bash
+Copy code
+postgresql+psycopg2://user:password@localhost:5432/rag_db
+
+## Configuration 
+| Key                           | Example                                                        | Notes                            |
+| ----------------------------- | -------------------------------------------------------------- | -------------------------------- |
+| `SECRET_KEY`                  | `change-me`                                                    | JWT signing                      |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `120`                                                          | Token TTL (minutes)              |
+| `DATABASE_URL`                | `postgresql+psycopg2://rag_user:rag_pass@postgres:5432/rag_db` | SQLAlchemy URL                   |
+| `POSTGRES_DB`                 | `rag_db`                                                       | Compose only                     |
+| `POSTGRES_USER`               | `rag_user`                                                     | Compose only                     |
+| `POSTGRES_PASSWORD`           | `rag_pass`                                                     | Compose only                     |
+| `QDRANT_URL`                  | `http://qdrant:6333`                                           | Vector DB endpoint               |
+| `QDRANT_COLLECTION`           | `jesa_docs`                                                    | Vector collection name           |
+| `GROQ_API_KEY`                | `...`                                                          | Groq LLM key                     |
+| `CORS_ORIGINS`                | `http://localhost:3000`                                        | Allowed frontend origin          |
+| `EMBEDDING_MODEL` (optional)  | `sentence-transformers/all-MiniLM-L6-v2`                       | Embeddings model                 |
+| `EMBED_DEVICE` (optional)     | `cpu` / `cuda`                                                 | Device for sentence-transformers |
+
+### 📜 License
+
+MIT © 2025 El-Houssaine El-Jihad
+
